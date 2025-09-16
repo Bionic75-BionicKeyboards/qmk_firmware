@@ -23,12 +23,12 @@ See appendix for [full glossary](#6-glossary-plain-but-precise).
 - Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own two wires (in and out) directly to the controller.<br>  
 Keyboard switch matrices are arranged in rows and columns. Without a matrix, each key typically needs its own controller pin (plus a common return pin, usually the shared GND), so a 104-key board would require about 105 GPIOs (which can make controller selection challenging).  <br>
 A matrix reduces this dramatically: for example, 6 rows × 17 columns (6x17 matrix) needs only 23 pins. Controllers with ~20–30 GPIOs are common, so this is practical.<br>
-![matrix overlay](https://raw.githubusercontent.com/BionicCode/qmk-documentation-resources/main/resources/how-a-matrix-works/images/matrix_overlay.png)
+![matrix overlay](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/matrix_overlay.png)
 **Figure 1** 75 % keyboard matrix overlay to highlight the electrical arrangement of keys switches in rows and columns.<br><br>
 
 - Think of a keyboard as a **grid**: **columns** on one side, **rows** on the other. Each key is a **switch** at the intersection of one column and one row, with a **diode** in series so current can only flow **from the column toward the row**.<br>
 In other words, in a switch matrix, each switch maps to a unique matrix coordinate described by row number and column number. Using this coordinate, the MCU indexes a lookup table to determine which key was pressed.<br>
-![2x2 switch matrix](https://raw.githubusercontent.com/BionicCode/qmk-documentation-resources/main/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png)  
+![2x2 switch matrix](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png)  
 **Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix, 8 pins would have been necessary - two pins for each switch.<br><br>
 
 - QMK scans by **activating one row at a time**: it **drives that row LOW** (to 0 V).

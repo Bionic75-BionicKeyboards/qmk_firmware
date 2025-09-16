@@ -4,15 +4,32 @@
 
 ---
 
+## Quick Glossary
+
+See appendix for [full glossary](#6-glossary-plain-but-precise).
+
+- **Anode**: The plus terminal of the diode.
+- **Cathode**: The minus terminal of te diode.
+- **Controller**: The micro controller (MCU) that controls the keyboard.
+- **Current**: Electrical charge that flows from **HIGH** to **LOW**. Current can never flow between same potentials like **HIGH** and **HIGH** or **LOW** and **LOW**. Usually **HIGH** is represented by **VCC** (~5 V or ~3.3 V) and **LOW** by 0 V or GND.
+- **Diode**: One‑way valve for current. In *COL2ROW*, it passes current **from column to row** only (and blocks the reverse).
+- **GPIO**: General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output**.  
+- **HIGH / LOW**: Digital logic levels. In QMK’s *COL2ROW* scanning, a **LOW on a column input** (while its row is active) means **key pressed**.
+- **Row / Column**: Two sets of physical wires forming a grid (the matrix). Each key connects one row to one column.
+- **Scan rate**: The frequency of full matrix scans. A full scan includes activating every row for each currently scanned column. **Activating a row** means setting it **LOW**. **Scanning a column** means detecting a **LOW** or **HIGH**. A full scan usually takes ~0.5-2 ms (0.5-3 kHz) on modern controllers.
+
 ## TL;DR (for impatient beginners)
 
--  Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own wire directly to the controller.
-![alt text](https://imgur.com/a/VepyQba)
-**Figure 1** Keyboard matrix overly to highlight the electrical arrangement of keys switches in rows and columns.<br><br>
+- Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own two wires (in and out) directly to the controller.<br>  
+Keyboard switch matrices are arranged in rows and columns. Without a matrix, each key typically needs its own controller pin (plus a common return pin, usually the shared GND), so a 104-key board would require about 105 GPIOs (which can make controller selection challenging).  <br>
+A matrix reduces this dramatically: for example, 6 rows × 17 columns (6x17 matrix) needs only 23 pins. Controllers with ~20–30 GPIOs are common, so this is practical.<br>
+![matrix overlay](https://raw.githubusercontent.com/BionicCode/qmk-documentation-resources/main/resources/how-a-matrix-works/images/matrix_overlay.png)
+**Figure 1** 75 % keyboard matrix overlay to highlight the electrical arrangement of keys switches in rows and columns.<br><br>
 
-- Think of a keyboard as a **grid**: **columns** on one side, **rows** on the other. Each key is a **switch** between one column and one row, with a **diode** in series so current can only flow **from the column toward the row**.  
-![matrix overlay](https://github.com/BionicCode/qmk-documentation-resources/blob/7ea574b0d8700a0a92a4521bdbea554fcc51c28f/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png) 
-**Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix 8 pins would have been necessary - two pins for each switch.<br><br>
+- Think of a keyboard as a **grid**: **columns** on one side, **rows** on the other. Each key is a **switch** at the intersection of one column and one row, with a **diode** in series so current can only flow **from the column toward the row**.<br>
+In other words, in a switch matrix, each switch maps to a unique matrix coordinate described by row number and column number. Using this coordinate, the MCU indexes a lookup table to determine which key was pressed.<br>
+![2x2 switch matrix](https://raw.githubusercontent.com/BionicCode/qmk-documentation-resources/main/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png)  
+**Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix, 8 pins would have been necessary - two pins for each switch.<br><br>
 
 - QMK scans by **activating one row at a time**: it **drives that row LOW** (to 0 V).
 - All **columns** are **inputs with pull‑ups** (they sit HIGH by default). 

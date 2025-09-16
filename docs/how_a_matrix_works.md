@@ -1,115 +1,114 @@
-# How a Keyboard Matrix Works
+# How a Keyboard Matrix Works (QMK Default: COL2ROW)
 
-Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own wire directly to the controller.
+> **Scope**: This guide explains QMK’s **default** matrix wiring and scanning: **diodes from column to row** (`DIODE_DIRECTION = COL2ROW`). There is an optional, “inverted” setup called **ROW2COL** (roles swapped). Because COL2ROW is far more common in QMK, we focus on it here and summarize ROW2COL at the end.
 
-When the circuit is arranged in rows and columns, if a key is pressed, a column wire makes contact with a row wire and completes a circuit. The keyboard controller detects this closed circuit and registers it as a key press.
+---
 
-The microcontroller will be set up via the firmware to send a logical 1 to the columns, one at a time, and read from the rows, all at once - this process is called matrix scanning. The matrix is a bunch of open switches that, by default, don't allow any current to pass through - the firmware will read this as no keys being pressed. As soon as you press one key down, the logical 1 that was coming from the column the keyswitch is attached to gets passed through the switch and to the corresponding row - check out the following 2x2 example:
+## TL;DR (for impatient beginners)
 
-```
-        Column 0 being scanned     Column 1 being scanned
-                  x                                   x
-                 col0     col1              col0     col1
-                  |        |                 |        |
-        row0 ---(key0)---(key1)    row0 ---(key0)---(key1)
-                  |        |                 |        |
-        row1 ---(key2)---(key3)    row1 ---(key2)---(key3)
-```
+-  Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own wire directly to the controller.
+![alt text](https://imgur.com/a/VepyQba)
+**Figure 1** Keyboard matrix overly to highlight the electrical arrangement of keys switches in rows and columns.<br><br>
 
-The `x` represents that the column/row associated has a value of 1, or is HIGH. Here, we see that no keys are being pressed, so no rows get an `x`. For one keyswitch, keep in mind that one side of the contacts is connected to its row, and the other, its column.
+- Think of a keyboard as a **grid**: **columns** on one side, **rows** on the other. Each key is a **switch** between one column and one row, with a **diode** in series so current can only flow **from the column toward the row**.  
+![matrix overlay](https://github.com/BionicCode/qmk-documentation-resources/blob/7ea574b0d8700a0a92a4521bdbea554fcc51c28f/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png) 
+**Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix 8 pins would have been necessary - two pins for each switch.<br><br>
 
-When we press `key0`, `col0` gets connected to `row0`, so the values that the firmware receives for that row is `0b01` (the `0b` here means that this is a bit value, meaning all of the following digits are bits - 0 or 1 - and represent the keys in that column). We'll use this notation to show when a keyswitch has been pressed, to show that the column and row are being connected:
+- QMK scans by **activating one row at a time**: it **drives that row LOW** (to 0 V).
+- All **columns** are **inputs with pull‑ups** (they sit HIGH by default). 
+- If a key on the active row is pressed, current flows **from the column’s pull‑up → switch → diode → the LOW row**, pulling that **column input LOW**. QMK reads that LOW as “key pressed.”
+- **Diodes prevent ghosting** (false key detections) by letting current flow in only one direction.
 
-```
-        Column 0 being scanned     Column 1 being scanned
-                  x                                   x
-                 col0     col1              col0     col1
-                  |        |                 |        |
-      x row0 ---(-+-0)---(key1)    row0 ---(-+-0)---(key1)
-                  |        |                 |        |
-        row1 ---(key2)---(key3)    row1 ---(key2)---(key3)
-```
+---
 
-We can now see that `row0` has an `x`, so has the value of 1. As a whole, the data the firmware receives when `key0` is pressed is:
+## 1 Rows vs. Columns and What “COL2ROW” Means
 
-```
-col0: 0b01
-col1: 0b00
-        │└row0
-        └row1
-```
+- **Columns (COLUMN)**: nets named `COLUMN0…COLUMNn`. In COL2ROW, columns are **inputs with pull‑ups** (not driven).  
+- **Rows (ROW)**: nets named `ROW0…ROWm`. In COL2ROW, rows are **outputs** that are **activated one at a time** by driving them **LOW**.  
+- **Diode orientation** for COL2ROW: **anode on the column side**, **cathode on the row side** (typically marked with a bar on the device package):
+![alt text](resources/images/how_a_matrix_works/diode_symbol.png)
+ This lets current flow from **column to row** (anode to cathode) only. Any reverse current from row to column is blocked by the diode.
 
-A problem arises when you start pressing more than one key at a time. Looking at our matrix again, it should become pretty obvious:
+Why is it named “COL2ROW”? Because that’s the **current’s allowed direction** through the diode: **from the column to the row**.
 
-```
-        Column 0 being scanned     Column 1 being scanned
-                  x                                   x
-                 col0     col1              col0     col1
-                  |        |                 |        |
-      x row0 ---(-+-0)---(-+-1)  x row0 ---(-+-0)---(-+-1)
-                  |        |                 |        |
-      x row1 ---(key2)---(-+-3)  x row1 ---(key2)---(-+-3)
+---
 
-      Remember that this ^ is still connected to row1
-```
+## 2) How Scanning Works (Step by Step)
+Let’s imagine a 2×2 example (2 columns × 2 rows). The MCU repeats this loop very quickly:
 
-The data we get from that is:
+1. **Prepare inputs**: Configure **all column pins** as **inputs with pull‑ups**. They idle at **HIGH**.
+2. **Select one row**: Configure **ROW0** as an output and **drive it LOW** (leave other rows as inputs or otherwise inactive).  
+3. **Read columns**: Instantly read every **column input**.  
+   - If **no key** on ROW0 is pressed, the column inputs remain **HIGH** (the pull‑ups hold them up).  
+   - If **key at (ROW0, COL1)** is pressed, current flows from **COL1 pull‑up → key switch → diode → ROW0 (LOW)** and **COL1 reads LOW** → QMK marks `(row=0, col=1)` as **pressed**.
+4. **Unselect the row**: Return **ROW0** to inactive (often input or driven HIGH depending on board options).  
+5. **Move to the next row**: Repeat steps 2–4 for **ROW1**, then ROW2, etc. This repeats thousands of times per second.
 
-```
-col0: 0b11
-col1: 0b11
-        │└row0
-        └row1
-```
+**Important polarity detail**: In COL2ROW, QMK uses **active‑LOW sensing**. A **LOW** on a column input (during that row’s active window) means **“key pressed.”**
 
-Which isn't accurate, since we only have 3 keys pressed down, not all 4. This behavior is called ghosting, and only happens in odd scenarios like this, but can be much more common on a bigger keyboard. The way we can get around this is by placing a diode after the keyswitch, but before it connects to its row. A diode only allows current to pass through one way, which will protect our other columns/rows from being activated in the previous example. We'll represent a dioded matrix like this;
+---
 
-```
-        Column 0 being scanned     Column 1 being scanned
-                    x                                   x
-                  col0      col1              col0     col1
-                    │        │                 |        │
-                 (key0)   (key1)            (key0)   (key1)
-                  ! │      ! │               ! |      ! │
-        row0 ─────┴────────┘ │     row0 ─────┴────────┘ │
-                    │        │                 |        │
-                 (key2)   (key3)            (key2)   (key3)
-                  !        !                 !        !
-        row1 ─────┴────────┘       row1 ─────┴────────┘
-```
+## 3) Why Diodes Are Needed (Ghosting vs. N‑Key)
+Without diodes, pressing certain **key combinations** can create unintended **current paths** that make the controller “see” extra keys that aren’t actually pressed. This is called **ghosting**.  
 
-In practical applications, the black line of the diode will be placed facing the row, and away from the keyswitch - the `!` in this case is the diode, where the gap represents the black line. A good way to remember this is to think of this symbol: `>|`
+**Diodes** in **series with each switch** ensure current can **only** flow **from column → row**. That **blocks back‑paths** that would otherwise light up other rows/columns and cause ghost keys. With correctly placed diodes (one per switch), you prevent those false connections and enable **rollover** beyond 2 keys (often full NKRO, subject to firmware/OS limits).
 
-Now when we press the three keys, invoking what would be a ghosting scenario:
+**Orientation matters**:
+- **Correct for COL2ROW**: **anode at column, cathode at row** (`column →|— row`).  
+- If you **flip** a diode, that key will never read (or will act strangely), because current can’t reach the active LOW row.
 
-```
-        Column 0 being scanned     Column 1 being scanned
-                    x                                   x
-                  col0      col1              col0     col1
-                    │        │                 │        │
-                 (┌─┤0)   (┌─┤1)            (┌─┤0)   (┌─┤1)
-                  ! │      ! │               ! │      ! │
-      x row0 ─────┴────────┘ │   x row0 ─────┴────────┘ │
-                    │        │                 │        │
-                 (key2)   (┌─┘3)            (key2)   (┌─┘3)
-                  !        !                 !        !
-        row1 ─────┴────────┘     x row1 ─────┴────────┘
-```
+---
 
-Things act as they should! Which will get us the following data:
+## 4) What You Configure in QMK
+Where you put it (legacy and modern layouts vary):
+- **`DIODE_DIRECTION`** → usually `COL2ROW`. Commonly set in **`config.h`** (C define) or in **`rules.mk`** in older setups. In JSON keyboards, **`info.json`** often uses `diode_direction`.  
+- **Matrix size** → `MATRIX_ROWS`, `MATRIX_COLS` in `config.h`, and per‑key wiring in `info.json`/keymaps.  
+- **Pin lists** → `MATRIX_ROW_PINS[]`, `MATRIX_COL_PINS[]` (C arrays in `config.h`) *or* corresponding JSON fields in `info.json` (e.g., `matrix_pins`).
 
-```
-col0: 0b01
-col1: 0b11
-        │└row0
-        └row1
-```
+At runtime, QMK’s matrix code will:
+- Set **columns** to **input‑pull‑up**.
+- For each row in turn, **drive that row LOW**, read all columns, record which columns read **LOW** (pressed), then move on.
 
-The firmware can then use this correct data to detect what it should do, and eventually, what signals it needs to send to the OS.
+> Tip: Some advanced options (e.g., `MATRIX_UNSELECT_DRIVE_HIGH`) change how “inactive” rows are parked (input vs. driven), but **do not** change the fundamental **active‑LOW** sensing in COL2ROW.
 
-Further reading:
-- [Wikipedia article](https://en.wikipedia.org/wiki/Keyboard_matrix_circuit)
-- [Deskthority article](https://deskthority.net/wiki/Keyboard_matrix)
-- [Keyboard Matrix Help by Dave Dribin (2000)](https://www.dribin.org/dave/keyboard/one_html/)
-- [How Key Matrices Works by PCBheaven](https://pcbheaven.com/wikipages/How_Key_Matrices_Works/) (animated examples)
-- [How keyboards work - QMK documentation](how_keyboards_work)
+---
+
+## 5) Common Pitfalls
+- **Wrong diode direction**: The most frequent wiring mistake. For COL2ROW, remember **`column →|— row`** (cathode to row).  
+- **Floating inputs**: If your columns aren’t set to **pull‑up**, they can float and cause random presses. In QMK, columns are configured with internal pull‑ups.  
+- **Crossed nets**: A single swapped row/column pin mapping can make an entire block of keys appear in the wrong positions. Double‑check `MATRIX_ROW_PINS`, `MATRIX_COL_PINS`.  
+- **Debounce**: Real switches bounce; enable QMK’s debounce (e.g., `DEBOUNCE` in `config.h`) so brief oscillations aren’t read as multiple presses.
+
+---
+
+## 6) Glossary (Plain but Precise)
+- **GPIO**: General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output**.  
+- **Input (with pull‑up)**: The MCU pin is reading a signal. “Pull‑up” means an internal resistor ties it weakly to **VCC**, so it idles **HIGH** unless pulled **LOW** by external circuitry.  
+- **Output (driven LOW/HIGH)**: The MCU pin is actively forcing **0 V (LOW)** or **VCC (HIGH)**.  
+- **HIGH / LOW**: Digital logic levels. In QMK’s COL2ROW scanning, a **LOW on a column input** (while its row is active) means **key pressed**.  
+Current flows from **HIGH** to **LOW**. Current can never flow between same potentials like **HIGH** and **HIGH** or **LOW** and **LOW**. Usually **HIGH** is represented by **VCC** (~5 V or ~3.3 V) and **LOW** by 0 V or GND. 
+- **Row / Column**: Two sets of wires forming a grid. Each key connects one row to one column.  
+- **Diode**: One‑way valve for current. In COL2ROW, it passes current **from column to row** only (blocks the reverse).  
+- **Ghosting**: False key detections caused by unintended current paths when pressing multiple keys without diodes.  
+- **Debounce**: Filtering/ignoring rapid on/off chatter when a mechanical switch first opens/closes.
+
+---
+
+## 7) What Changes in ROW2COL (Quick Reference)
+ROW2COL simply **swaps roles**:  
+- **Columns** are **driven LOW one at a time**, and **rows** are **inputs with pull‑ups**.  
+- **Diode orientation flips** accordingly: **anode at the row, cathode at the column** (`row →|— column`).  
+- Firmware logic is otherwise the same idea: drive one side, read the other; a **LOW** on the input side (during that line’s active window) means pressed.
+
+---
+
+## 8) Schematic for the Docs
+A KiCad 9 schematic named **`col2row_matrix_example.kicad_sch`** is provided alongside this document. It shows a **2×2 matrix** wired for **COL2ROW** (diodes from column to row). You can open it in KiCad and export an SVG/PNG to embed in this page.
+
+> When in doubt about polarity: **the diode’s black band (cathode) faces the ROW.**
+
+---
+
+### Credits & Notes
+- This rewrite aligns the explanation and the diode orientation with QMK’s **actual default COL2ROW** scanning behavior.  
+- For deeper dives, see QMK’s `matrix.c` and your keyboard’s `config.h`/`info.json` for exact pin lists and options.

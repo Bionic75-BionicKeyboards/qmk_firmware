@@ -1,35 +1,189 @@
-# How a Keyboard Matrix Works (QMK Default: COL2ROW)
+# How a Keyboard Matrix Works
 
-> **Scope**: This guide explains QMK’s **default** matrix wiring and scanning: **diodes from column to row** (`DIODE_DIRECTION = COL2ROW`). There is an optional, “inverted” setup called **ROW2COL** (roles swapped). Because COL2ROW is far more common in QMK, we focus on it here and summarize ROW2COL at the end.
+>[!NOTE]
+>**Scope**: This guide explains matrix wiring and scanning. The first part offers a brief and beginner friendly explanation. The second section [An In-depth Discussion Of Keyboard Matrix](#an-in-depth-discussion-of-keyboard-matrix) offers a more detailed discussion to provide a more advanced understanding while still aiming at beginners.
+>
+> While the concept of a keyboard or switch matrix is universal, this guide considers implementation details of the QMK firmware. This doesn't affect the wiring (hardware-side implementation) but the firmware level scanning procedure.  
+>
+>QMK offers two matrix scanning algorithms which are called `COL2ROW` and `ROW2COL`. This guide focuses on the `COL2ROW` algorithm as this is the default configuration that is commonly used. `ROW2COL` will be briefly addressed in the end by highlighting the differences.
 
 ---
 
-## Quick Glossary
+## A Brief Introduction For Beginners
 
-See appendix for [full glossary](#6-glossary-plain-but-precise).
+### Quick Glossary
 
-- **Anode**: The plus terminal of the diode.
-- **Cathode**: The minus terminal of te diode.
-- **Controller**: The micro controller (MCU) that controls the keyboard.
-- **Current**: Electrical charge that flows from **HIGH** to **LOW**. Current can never flow between same potentials like **HIGH** and **HIGH** or **LOW** and **LOW**. Usually **HIGH** is represented by **VCC** (~5 V or ~3.3 V) and **LOW** by 0 V or GND.
-- **Diode**: One‑way valve for current. In *COL2ROW*, it passes current **from column to row** only (and blocks the reverse).
-- **GPIO**: General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output**.  
-- **HIGH / LOW**: Digital logic levels. In QMK’s *COL2ROW* scanning, a **LOW on a column input** (while its row is active) means **key pressed**.
-- **Row / Column**: Two sets of physical wires forming a grid (the matrix). Each key connects one row to one column.
-- **Scan rate**: The frequency of full matrix scans. A full scan includes activating every row for each currently scanned column. **Activating a row** means setting it **LOW**. **Scanning a column** means detecting a **LOW** or **HIGH**. A full scan usually takes ~0.5-2 ms (0.5-3 kHz) on modern controllers.
+See appendix for [full glossary](#6-glossary-plain-but-precise) and external educational content links.
 
-## TL;DR (for impatient beginners)
+- **Current**: Flows from +/`HIGH` to –/`LOW` through a closed path.
+- **Diode:** A small electronic device that only allows current to pass in one direction. If current is reversed, it will block. A diode is a electrical one-way barrier.
+- **`HIGH`/`LOW`:** Logic levels. `HIGH` usually refers to the logic system voltage (usually 3.3 V or 5 V). `LOW` usually refers to 0 V.
+- **Row / Column**: The two sets of wires that form the grid; each switch connects one row to one column.
+- **COL2ROW**: Columns are inputs with pull-ups; the selected row is driven LOW.
+- **Ghost (phantom) key**: A false keypress that can appear in a diode-less matrix when certain multi-key combos are pressed.
+- **Scanning**: The periodical reading of the all key states (pressed/depressed or open/closed in switch terminology) by the microcontroller.
+- **Microcontroller**: A chip device that run a program (firmware) to control and add behavior to  the hardware.
+
+### The Concept
+
+- A keyboard matrix aims to simplify wiring of switches by reducing the amount of physical pins required on the microcontroller. It removes complexity from the hardware level.
+- In a matrix, all switches are arranged (wired) in rows and columns. Each row and each column is connected to an associated single pin on the microcontroller but to multiple switches ot once.
+
+- Switches (keys) are abstractly viewed as logic circuits, where a open switch represent logical `HIGH` and a closed switch (pressed key) represents logical `LOW`.
+- A microcontroller periodically scans all switches. It will visit each switch via the connected input pin to read whether it is `HIGH` (unpressed) or `LOW` (pressed).
+- There are edge cases where a key can read pressed (`LOW`) despite the switch being open (`High`). This unwanted effect is called "ghosting". A dedicated diode at each switch is used to eliminate the ghosting effect.
+
+### Before The matrix
+
+Without a switch matrix every switch must be wired directly to a pin on the microcontroller:
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/36_switches_direct_wiring_example_basic.png)  
+***Figure 1:** 36 switches directly wired to a microcontroller pin with a common GND. Therefore, each key requires a dedicated pin (in this case 36 pins) which scales badly.*
+
+As we can see in Figure 1, each switch requires a dedicated pin on the microcontroller. The microcontroller will then scan each switch independently via the dedicated net. The return line of the switch is usually the shared GND signal.  
+
+To scan the switches, the microcontroller would pull-up the pin that connects to the currently scanned switch (i.e. setting the pin `HIGH`). As a result, the open switch would read `High`. When the switch is closed, the pin is pulled down to GND (0 V or logical `LOW`), which the microcontroller then interprets as a pressed key.
+
+It's apparent that this kind of wiring is not very efficient in terms of scaling. Given the example's 36 switches, we would already exceed the limit of available pins on most common microcontrollers. Building a keyboard this way will be extremely difficult.
+
+For example, a full-size keyboard usually comes with 104 (ANSI) or 105 (ISO) keys. This translates to 105 pins only for the switches. Such a microcontroller is out of scope.
+
+The solution is to share pins between multiple switches by introducing more efficient wiring concept: the matrix design.
+
+### The Matrix To The Rescue
+
+To significantly reduce the amount of pins required for a keyboard, switches are organized in a matrix. A matrix electrically arranges the switches in rows and columns.
+
+These rows and columns are not required to match the actual arrangement of the switches. Instead they describe the electrical wiring. However, to make working with the matrix easier e.g. key mapping, rows and columns usually follow the physical switch arrangement as close as possible.
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/matrix_overlay.png)  
+***Figure 2:** The actual electrical wiring of the keys overlayed on a keyboard layout to highlight how physical keys and electrical wiring are ideally equal. The virtual grid consisting of rows and columns is clearly visible, where each intersection (matrix coordinate) maps to an individual key.*
+
+ For example, in a 6x17 matrix (6 rows and 17 column) a full-size keyboard consisting of 104 switches only requires 23 pins (6 rows + 17 columns). That's drastically less opposed to the 104 pins when wiring each switch directly. A matrix in this case saves ~78 % pins. And a microcontroller with 23 available pins is easy and cheap to source.
+
+The following example shows a 6x6 matrix including diodes:  
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/6x6_switch_matrix_example_basic.png)  
+***Figure 3:** A 6x6 matrix including the anti-ghosting diodes. The schematic also highlights how only 12 pins are required to address 36 switches.*
+
+The diodes are necessary to solve the ghosting effect problem.
+
+### Scanning The Matrix
+
+The scan is conducted by the firmware. It dynamically controls the pins of the microcontroller during scanning by configuring them as inputs or outputs and change their logic level from `HIGH`to `LOW` and back.
+
+>[!TIP]  
+>In microcontroller systems the terms ***input* and *output* do not define the direction of how current/signals flows**. Current can also flow into an output or out of an input as the direction of current merely depends on voltage differences between connected pins (electrical potentials).
+>
+>*Input* and *output* describe the behavior or purpose of a pin. Furthermore, if a pin is configured to be digital, any analog voltage on that pin is interpreted as a logic signal (`HIGH` or `LOW`).
+>
+>- **Output:** The *output* pin is **active** (actively changing state). The *output* is **driving the circuit**. In other words, a *output* **sends signals**. If the *output* is digital, the signal is either `High` or `LOW`.
+>- **Input:** The *input* pin is **passive** (passively changing state). The *input* is **reading from the circuit**. A *input* **receives signals** sent from an *output*.
+>- **Current:** The direction a current flows is always defined by voltage potentials and not pin I/O configuration. Current always flows from the higher potential (higher voltage or a logical `HIGH`) to a lower potential (lower voltage or logical `LOW`).
+
+The logical matrix scan algorithm is as follows:  
+
+- To detect a key press, the rows are **actively driven** `LOW` and the **columns (`HIGH`) are scanned**. Current will flow from column (`HIGH`) through the potentially closed switch to the active row (`LOW`). Therefore, **columns are passive** and **rows are active**.  
+
+>[!IMPORTANT]
+>**Columns** are *always* (i.e. permanent) inputs, set to `HIGH` ("pulled up") whereas **rows** are *temporarily* (during activation) configured as outputs and *driven* `LOW`** when activated and reset to be an input and pulled back `HIGH` when inactive (after a full row scan).
+
+- **Next, a row is activated** (pulled `LOW`) and the microcontroller will start to **scan each column** to look for a `LOW` column (the column is pulled `LOW` when connected to another `LOW` signal (the row) via a closed switch).
+- After each column was read, the **currently active row is deactivated** by resetting it back to input behavior and pulling it back `HIGH`. **The microcontroller advances to the next row**.
+- The microcontroller activates the next row and again reads every column one-by-one to look for a `LOW`.
+- The scan-columns-and-advance-to-next-row procedure continues until the full matrix has been read i.e. all rows have been visited.
+
+>[!TIP]
+>This logic behavior, where the default logic level is `HIGH` and the activation is signalled by a `LOW` level, is called "active-low" logic (or sometimes also called "negative logic").  
+>
+>If the logic had been inverted, which is the logic's default is `LOW` and levels go `HIGH`on activation, this would be an "active-high" logic or behavior (sometimes also referred to as "positive logic").  
+>
+>QMK's matrix scanning logic is active-low: `HIGH` is the default and `LOW` the activation signal, in this case switch closed.
+
+#### Controller Pin Equivalent Circuit
+
+Do get an idea how current flows and why the logic levels (voltages) are actually changing (why inputs (columns) change their logic state), we must analyze the electrical equivalent circuit of a microcontroller pin. This can help to understand the logic behavior.  
+
+>[!TIP]
+>A microcontroller integrates multiple circuits that consist of multiple integrated parts like diodes, resistors, capacitors, FETs, inductors and other semi-conductor elements.
+>
+>The pull-up resistors that are depicted in the following images are such integrated parts that form an integrated circuit.  
+The following equivalent circuits are simplifications of such integrated circuits.
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/equivalent_circuit_unpressed.png)  
+***Figure 4:** The simplified electrical equivalent circuit of microcontroller pins as configured for the switch matrix. The image shows the unpressed key state (the switch `Key1`is open).*
+
+**Figure 4** shows the electrical equivalent circuit of an open switch connection between a row and a column, where **blue arrows symbolize a voltage drop and red arrows a current**.
+
+The image shows how the input pin (on the right) is pulled `HIGH` by a pull-up resistor. The pull-up resistor basically internally connects the pin to the controller's supply voltage `VDD`, which is most commonly 3.3 V. The pull-up is integrated into the controller. The voltage range 2.4 V-3.3 V on the pin is typically interpreted as logic `HIGH`.
+
+On the left side we see the activated row pin. The pin is internally connected to the ground net `GND` (0 V). The range 0 V-0.9 V is typically interpreted as logic `LOW`.
+
+Both pins are connected by a switch `Key1` (the actual keyboard key) and a diode `D1`. The diode is required to mitigate the ["ghosting effect"](#).
+
+Since the switch `Key1` is unpressed, no current can flow from input to output (no voltage drop (0 V) across `R1` and `D1`). As the consequence, the input remains `HIGH` which the controller interprets as an unpressed key.
+
+Too change the logic level on the input (column) to `LOW`, a current must flow via the switch to the output (row).
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/equivalent_circuit_pressed.png)  
+***Figure 5:** The simplified electrical equivalent circuit of microcontroller pins as configured for the switch matrix. The image shows the pressed key state (the switch `Key1` is closed).*
+
+Figure 5 shows the same electrical equivalent circuit as in **Figure 4**. But this time the switch `Key1` is pressed (closed). As a consequence, a tiny current will now flow from the input pin (column) to the output pin (row). The current causes a voltage drop across the pull-up resistor `R1` (a 3.0 V drop as the current flows through `R1`) and the diode `D1` (a 0.3 V drop).
+
+The result is a voltage of 0.3 V on the input pin (column) which the controller interprets as a logic `LOW`. Then the QMK firmware will read this `LOW` on the column pin and interpret it as a pressed key.
+
+Now that we understand some of the electric fundamentals of how and why currents flow and voltages drop in a matrix we can get deeper into how scanning of a switch matrix works.  
+The following section walks through a full matrix scan step-by-step, exemplified with a 2x2 switch matrix.
+
+#### 0. Initial State Before Scanning
+
+In the beginning, when the firmware is initialized, **all columns and rows are configured as inputs and pulled up `HIGH`** (see **Figure 6** below).  
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/2x2_matrix_scanning_example_step_0.png)  
+***Figure 6:** The 2x2 example matrix. The image shows how all pins (rows and columns) are `HIGH` and therefore inactive. Especially the rows are inactive which becomes visible when looking at the symbol's arrow pointing direction, which points into the circuit (input). Later, the row will be activated and becomes an output that is pulled `LOW`.*
+
+##### Discussion Initialization Step
+
+- While the **columns will never change their configuration** (they will stay inputs that are pulled up), the **rows will be temporarily configured as outputs and then pulled `LOW`** one after the other.  
+
+- There is only a single row output and pulled `LOW`at the time: the currently scanned row.
+
+>[!NOTE]
+>In other words, columns are ***always*** inputs and `HIGH` by default, whereas **rows are configured as outputs and pulled `LOW` only when activated** for a scan and then reset back to a `HIGH` input after the rows has been scanned.
+
+#### 1. Scanning First Column Of First Row
+
+The scanning starts with the first row by configuring the pin that is connected to the first row as output (until all columns have been scanned). Now, to allow a current to flow, the row pin is pulled `LOW` (current flows from `HIGH` to `LOW` i.e. column to row).  
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/2x2_matrix_scanning_example_step_1.png)  
+***Figure 7:** `ROW0` is activated (label is bold and blue) by configuring it as output (label arrow points out of the circuit) and pulling the pin `LOW`. Then the first column `COLUMN0`  is scanned (label is bold and blue) and a key press detected, since `COLUMN0` has changed from `HIGH` to `LOW`. The green arrows show how the current is flowing.*
+
+##### Discussion Step 1
+
+- Because the switch `Key1` is closed, the current can flow from `COLUMN0` to `ROW0`. The result is that the column `COLUMN0` is also pulled `LOW` (voltage drops as current flows into the row pin `ROW0`). 
+- When the microcontroller scans the first column it reads a `LOW` and interprets it correctly as a closed switch (pressed key).
+
+- Since the other switches are not closed, no current can flow as there is no physical connection between column and row. However, even if the other switches had been closed, the microcontroller will not detect them in the current step as only `ROW0` and `COLUMN0` are scanned at the moment.
+
+#### 2. Scanning Second Column Of First Row
+
+The microcontroller advances to the next column `COLUMN1` of the same row `ROW0`. 
+
+![alt text](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/2x2_matrix_scanning_example_step_2.png)  
+**Figure 6:** 
+
+
+For every row that is pulled `LOW` the microcontroller will read every column to detect a `LOW` (a key press). Because every column is `HIGH` by default and the active row
 
 - Keyboard switch matrices are arranged in rows and columns. Without a matrix circuit, each switch would require its own two wires (in and out) directly to the controller.<br>  
 Keyboard switch matrices are arranged in rows and columns. Without a matrix, each key typically needs its own controller pin (plus a common return pin, usually the shared GND), so a 104-key board would require about 105 GPIOs (which can make controller selection challenging).  <br>
 A matrix reduces this dramatically: for example, 6 rows × 17 columns (6x17 matrix) needs only 23 pins. Controllers with ~20–30 GPIOs are common, so this is practical.<br>
 ![matrix overlay](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/matrix_overlay.png)  
-**Figure 1** Example 75 % keyboard matrix overlay to highlight the electrical arrangement of keys switches in rows and columns.<br><br>
+***Figure 1** Example 75 % keyboard matrix overlay to highlight the electrical arrangement of keys switches in rows and columns.*<br><br>
 
 - Think of a keyboard as a **grid**: **columns** on one side, **rows** on the other. Each key is a **switch** at the intersection of one column and one row, with a **diode** in series so current can only flow **from the column toward the row**.<br>
 In other words, in a switch matrix, each switch maps to a unique matrix coordinate described by row number and column number. Using this coordinate, the MCU indexes a lookup table to determine which key was pressed.<br>
 ![2x2 switch matrix](https://bioniccode.github.io/qmk-documentation-resources/resources/how-a-matrix-works/images/2x2_switch_matrix_basic.png)  
-**Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix, 8 pins would have been necessary - two pins for each switch.<br><br>
+***Figure 2** An example 2x2 switch matrix. It shows how four controller pins (ROW0, ROW1, COLUMN0, COLUMN1) allow the addressing of 4 switches. Without a matrix, 8 pins would have been necessary - two pins for each switch.*<br><br>
 
 - QMK scans by **activating one row at a time**: it **drives that row LOW** (to 0 V).
 - All **columns** are **inputs with pull‑ups** (they sit HIGH by default). 
@@ -37,6 +191,8 @@ In other words, in a switch matrix, each switch maps to a unique matrix coordina
 - **Diodes prevent ghosting** (false key detections) by letting current flow in only one direction.
 
 ---
+
+## An In-depth Discussion Of Keyboard Matrix
 
 ## 1 Rows vs. Columns and What “COL2ROW” Means
 
@@ -99,6 +255,8 @@ At runtime, QMK’s matrix code will:
 ---
 
 ## 6) Glossary (Plain but Precise)
+
+- **Current**: Current (I): The rate of flow of electric charge, measured in amperes (A). In circuits, current flows when there is a closed path between two or more electric potentials/voltage differences (ΔV). By convention, current is taken to flow from higher electric potential (higher voltage, labelled "+" or in logics "logical HIGH") to a lower potential (lower voltage, labelled "-" or in logics "logical LOW"). With no voltage difference between two points, there is no conduction current between them in steady state. In many microcontroller systems, HIGH is near the supply (VCC, commonly ~5 V or ~3.3 V) and LOW is 0 V (GND).
 - **GPIO**: General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output**.  
 - **Input (with pull‑up)**: The MCU pin is reading a signal. “Pull‑up” means an internal resistor ties it weakly to **VCC**, so it idles **HIGH** unless pulled **LOW** by external circuitry.  
 - **Output (driven LOW/HIGH)**: The MCU pin is actively forcing **0 V (LOW)** or **VCC (HIGH)**.  
@@ -108,6 +266,17 @@ Current flows from **HIGH** to **LOW**. Current can never flow between same pote
 - **Diode**: One‑way valve for current. In COL2ROW, it passes current **from column to row** only (blocks the reverse).  
 - **Ghosting**: False key detections caused by unintended current paths when pressing multiple keys without diodes.  
 - **Debounce**: Filtering/ignoring rapid on/off chatter when a mechanical switch first opens/closes.
+
+- **Anode**: The plus terminal of the diode.
+- **Cathode**: The minus terminal of the diode.
+- **Controller**: The micro controller (MCU) that controls the keyboard.
+- **Current**: Current (I): The rate of flow of electric charge, measured in amperes (A). In circuits, current flows when there is a closed path between two or more electric potentials/voltage differences (ΔV). By convention, current is taken to flow from higher electric potential (higher voltage, labelled "+" or in logics "logical HIGH") to a lower potential (lower voltage, labelled "-" or in logics "logical LOW"). With no voltage difference between two points, there is no conduction current between them in steady state. In many microcontroller systems, HIGH is near the supply (VCC, commonly ~5 V or ~3.3 V) and LOW is 0 V (GND).
+- **Diode**: One‑way valve for current. In *COL2ROW*, it passes current **from column to row** only (and blocks the reverse).
+- **GPIO**: General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output**.  
+- **HIGH / LOW**: Digital logic levels. In QMK’s *COL2ROW* scanning, a **LOW on a column input** (while its row is active) means **key pressed**.
+- **Row / Column**: Two sets of physical wires forming a grid (the matrix). Each key connects one row to one column.
+- **Scan rate**: The frequency of full matrix scans. A full scan includes activating every row for each currently scanned column. **Activating a row** means setting it **LOW**. **Scanning a column** means detecting a **LOW** or **HIGH**. A full scan usually takes ~0.5-2 ms (0.5-3 kHz) on modern controllers.
+
 
 ---
 

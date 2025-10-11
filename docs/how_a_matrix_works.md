@@ -283,7 +283,9 @@ By convention, current is taken to flow from higher electric potential (higher v
 
 **With no voltage difference between two points**, there is no conduction current between them in steady state. In many microcontroller systems, `HIGH` is near the supply (`VCC`, commonly ~5 V or ~3.3 V) and `LOW` is 0 V (`GND`) (see [Logical HIGH/LOW](#logical-highlow)).
 
-See Wikipedia: [Electric current](https://en.wikipedia.org/wiki/Electric_current).
+#### See also
+
+- Wikipedia: [Electric current](https://en.wikipedia.org/wiki/Electric_current)
 
 ### Logical HIGH/LOW
 
@@ -301,7 +303,9 @@ Based on the actual active state of a system (see [Active-HIGH/Active-LOW](#acti
 
 In QMK’s **COL2ROW** scanning, a `LOW` on a column input (while its row is active) means key pressed. A `LOW` on a row output means that row is active.
 
-See Wikipedia: [Logic level](https://en.wikipedia.org/wiki/Logic_level).
+#### See also
+
+- Wikipedia: [Logic level](https://en.wikipedia.org/wiki/Logic_level)
 
 ### Active-HIGH/Active-LOW
 
@@ -312,13 +316,19 @@ In an active-low configuration, the signal is considered "active" or "asserted" 
 Conversely, in an active-high configuration, the signal is considered "active" when it is at a `HIGH` voltage level (close to `VCC`, typically 3.3 V or 5 V, see [VCC/VDD](#vccvdd)).
 
 See [Logical HIGH/LOW](#logical-highlow) for more information on logic levels.
-See Wikipedia: [Active-low](https://en.wikipedia.org/wiki/Active_low) and [Active-high](https://en.wikipedia.org/wiki/Active_high).
+
+#### See also
+
+- Wikipedia: [Active-low](https://en.wikipedia.org/wiki/Active_low)
+- Wikipedia: [Active-high](https://en.wikipedia.org/wiki/Active_high)
 
 ### GPIO
 
 General‑Purpose Input/Output pin on the MCU. Can be configured as **input** or **output** (see [Input/Output](#inputoutput)). Opposed to dedicated pins like UART, SPI, I2C, etc. GPIOs are flexible and can be used for various purposes, including reading switches in a keyboard matrix.
 
-See Wikipedia: [General-purpose input/output](https://en.wikipedia.org/wiki/General-purpose_input/output).
+#### See also
+
+- Wikipedia: [General-purpose input/output](https://en.wikipedia.org/wiki/General-purpose_input/output)
 
 ### Input/Output
 
@@ -334,7 +344,9 @@ The pin is **passive** (passively changing state). The pin is **reading from the
 
 The pin is **active** (actively changing state and therefore sending information). The pin is **driving the circuit**. An output **sends signals**. If the output is digital, the signal is either `HIGH` or `LOW`.
 
-See Wikipedia: [Input/output](https://en.wikipedia.org/wiki/Input/output).
+#### See also
+
+- Wikipedia: [Input/output](https://en.wikipedia.org/wiki/Input/output)
 
 ### Pull‑up Resistor
 
@@ -346,7 +358,9 @@ Typically, pull‑up resistors have high resistance values (e.g., 10 kΩ to 100 
 
 Microcontrollers often have **internal pull‑up resistors** that can be enabled via software configuration, eliminating the need for external components.
 
-See Wikipedia: [Pull-up resistor](https://en.wikipedia.org/wiki/Pull-up_resistor).
+##### See also
+
+- Wikipedia: [Pull-up resistor](https://en.wikipedia.org/wiki/Pull-up_resistor)
 
 ### Pull‑down Resistor
 
@@ -358,13 +372,18 @@ Typically, pull‑down resistors have high resistance values (e.g., 10 kΩ to 10
 
 Pull-down resistors are less common than pull-up resistors in microcontroller applications, as many microcontrollers provide internal pull-up resistors but not internal pull-down resistors.
 
-See Wikipedia: [Pull-down resistor](https://en.wikipedia.org/wiki/Pull-down_resistor).
+#### See also
+
+- Wikipedia: [Pull-down resistor](https://en.wikipedia.org/wiki/Pull-down_resistor)
 
 ### VCC/VDD
 
 The positive supply voltage for a circuit or device. Common values are 3.3 V and 5 V in microcontroller systems. `VCC` is often used interchangeably with `VDD`, although technically `VCC` refers to the collector supply voltage in bipolar junction transistor circuits, while `VDD` refers to the drain supply voltage in field-effect transistor circuits.
 
-See Wikipedia: [V_CC](https://en.wikipedia.org/wiki/V_CC) and [V_DD](https://en.wikipedia.org/wiki/V_DD).
+#### See also
+
+- Wikipedia: [V_CC](https://en.wikipedia.org/wiki/V_CC)
+- Wikipedia: [V_DD](https://en.wikipedia.org/wiki/V_DD)
 
 ### GND/VSS
 
@@ -372,7 +391,10 @@ The ground reference point in a circuit, typically 0 V. All voltage levels are m
 
 `GND` is often used interchangeably with `VSS`, although technically `GND` refers to the ground reference in general, while `VSS` specifically refers to the source supply voltage in field-effect transistor circuits.
 
-See Wikipedia: [Ground (electricity)](https://en.wikipedia.org/wiki/Ground_(electricity)) and [V_SS](https://en.wikipedia.org/wiki/V_SS).
+#### See also
+
+- Wikipedia: [Ground (electricity)](https://en.wikipedia.org/wiki/Ground_(electricity))
+- Wikipedia: [V_SS](https://en.wikipedia.org/wiki/V_SS)
 
 ### Diode
 
@@ -388,7 +410,9 @@ Different types of diodes exist, each with specific characteristics such as forw
 
 Famous diode types used in keyboard matrices include 1N4148 (small signal diode) and 1N400x series (general purpose rectifier diodes).
 
-See Wikipedia: [Diode](https://en.wikipedia.org/wiki/Diode).
+#### See also
+
+- Wikipedia: [Diode](https://en.wikipedia.org/wiki/Diode)
 
 ### Anode/Cathode
 
@@ -397,7 +421,9 @@ See Wikipedia: [Diode](https://en.wikipedia.org/wiki/Diode).
 
 The cathode is usually marked with a band on the diode package.
 
-See Wikipedia: [Diode#Polarity](https://en.wikipedia.org/wiki/Diode#Polarity).
+#### See also
+
+- Wikipedia: [Diode#Polarity](https://en.wikipedia.org/wiki/Diode#Polarity)
 
 - **Row / Column**: Two sets of wires forming a grid. Each key connects one row to one column.  
 - **Diode**: One‑way valve for current. In COL2ROW, it passes current **from column to row** only (blocks the reverse).  
